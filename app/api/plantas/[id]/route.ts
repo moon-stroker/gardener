@@ -12,7 +12,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   const [planta] = await db.select().from(plantas).where(eq(plantas.id, id));
   if (!planta) return notFound("Planta no encontrada");
 
-  const [fotosDePlanta, bitacoraDePlanta, recomendacionesDePlanta, estado] = await Promise.all([
+  const [fotosDePlanta, bitacoraDePlanta, recomendacionesDePlanta, { estado, motivos }] = await Promise.all([
     db.select().from(fotos).where(eq(fotos.plantaId, id)).orderBy(desc(fotos.fecha)),
     db.select().from(bitacora).where(eq(bitacora.plantaId, id)).orderBy(desc(bitacora.fecha)),
     db.select().from(recomendaciones).where(eq(recomendaciones.plantaId, id)).orderBy(desc(recomendaciones.creadoEn)),
@@ -22,6 +22,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   return NextResponse.json({
     ...planta,
     estado,
+    motivos,
     fotos: fotosDePlanta,
     bitacora: bitacoraDePlanta,
     recomendaciones: recomendacionesDePlanta,

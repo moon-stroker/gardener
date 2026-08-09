@@ -13,9 +13,6 @@ export default function NuevaPlanta() {
   const router = useRouter();
   const [nombre, setNombre] = useState("");
   const [especie, setEspecie] = useState("");
-  const [reglaRiegoDias, setReglaRiegoDias] = useState("3");
-  const [reglaPodaDias, setReglaPodaDias] = useState("");
-  const [reglaFertilizacionDias, setReglaFertilizacionDias] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,13 +30,7 @@ export default function NuevaPlanta() {
       const res = await fetch("/api/plantas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre,
-          especie: especie.trim() || null,
-          reglaRiegoDias: Number(reglaRiegoDias) || null,
-          reglaPodaDias: reglaPodaDias ? Number(reglaPodaDias) : null,
-          reglaFertilizacionDias: reglaFertilizacionDias ? Number(reglaFertilizacionDias) : null,
-        }),
+        body: JSON.stringify({ nombre, especie: especie.trim() || null }),
       });
       if (!res.ok) throw new Error();
       const planta = await res.json();
@@ -87,21 +78,10 @@ export default function NuevaPlanta() {
               onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
               className="text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-accent"
             />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className={etiqueta} htmlFor="riego">Riego (días)</label>
-              <input id="riego" type="number" min={1} className={campo} value={reglaRiegoDias} onChange={(e) => setReglaRiegoDias(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={etiqueta} htmlFor="poda">Poda (días)</label>
-              <input id="poda" type="number" min={1} className={campo} value={reglaPodaDias} onChange={(e) => setReglaPodaDias(e.target.value)} placeholder="—" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className={etiqueta} htmlFor="fert">Fertilización (días)</label>
-              <input id="fert" type="number" min={1} className={campo} value={reglaFertilizacionDias} onChange={(e) => setReglaFertilizacionDias(e.target.value)} placeholder="—" />
-            </div>
+            <p className="text-xs text-muted">
+              Si subes una foto, la IA sugerirá cada cuántos días regarla, podarla y fertilizarla según la especie — tú no tienes que
+              adivinarlo. Puedes ajustarlo después desde &quot;Editar datos&quot; en el perfil.
+            </p>
           </div>
 
           {error && <p className="text-sm font-medium text-rojo">{error}</p>}

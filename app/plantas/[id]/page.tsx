@@ -43,6 +43,7 @@ interface PlantaDetalle {
   reglaPodaDias: number | null;
   reglaFertilizacionDias: number | null;
   estado: Estado;
+  motivos: string[];
   fotos: Foto[];
   bitacora: Bitacora[];
   recomendaciones: Recomendacion[];
@@ -238,6 +239,15 @@ export default function PerfilPlanta() {
     if (res) cargar();
   }
 
+  async function registrarCuidado(tipo: "riego" | "poda" | "fertilizacion") {
+    const res = await llamar(`/api/plantas/${id}/bitacora`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo }),
+    });
+    if (res) cargar();
+  }
+
   async function reintentarAnalisis(foto: Foto) {
     setReintentando(foto.id);
     setMensajeAnalisis(null);
@@ -305,6 +315,20 @@ export default function PerfilPlanta() {
               <Regla etiqueta="Fertilizar cada" valor={planta.reglaFertilizacionDias} sufijo="días" />
             </div>
 
+            {planta.reglaRiegoDias == null && planta.reglaPodaDias == null && planta.reglaFertilizacionDias == null && (
+              <p className="text-xs text-muted">
+                Todavía no hay reglas de cuidado — sube una foto para que la IA las sugiera según la especie.
+              </p>
+            )}
+
+            {planta.estado !== "verde" && planta.motivos.length > 0 && (
+              <ul className={`flex flex-col gap-1 rounded-md border px-3 py-2 text-sm ${planta.estado === "rojo" ? "border-rojo-soft bg-rojo-soft text-rojo" : "border-amarillo-soft bg-amarillo-soft text-amarillo"}`}>
+                {planta.motivos.map((motivo) => (
+                  <li key={motivo}>{motivo}</li>
+                ))}
+              </ul>
+            )}
+
             <div className="flex flex-wrap gap-2">
               <input
                 ref={fileRef}
@@ -320,6 +344,15 @@ export default function PerfilPlanta() {
               <Button onClick={() => fileRef.current?.click()} disabled={subiendo}>
                 {subiendo ? "Analizando…" : "Subir foto y analizar"}
               </Button>
+              {planta.reglaRiegoDias != null && (
+                <Button variant="ghost" onClick={() => registrarCuidado("riego")}>Regué hoy</Button>
+              )}
+              {planta.reglaPodaDias != null && (
+                <Button variant="ghost" onClick={() => registrarCuidado("poda")}>Podé hoy</Button>
+              )}
+              {planta.reglaFertilizacionDias != null && (
+                <Button variant="ghost" onClick={() => registrarCuidado("fertilizacion")}>Fertilicé hoy</Button>
+              )}
               <Button variant="ghost" onClick={() => setEditando((v) => !v)}>
                 {editando ? "Cerrar edición" : "Editar datos"}
               </Button>
@@ -489,10 +522,22 @@ function EditarPlantaForm({ planta, onGuardado }: { planta: PlantaDetalle; onGua
         <input className={campo} value={especie} onChange={(e) => setEspecie(e.target.value)} placeholder="Especie" />
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <input className={campo} type="number" value={riego} onChange={(e) => setRiego(e.target.value)} placeholder="Riego (días)" />
-        <input className={campo} type="number" value={poda} onChange={(e) => setPoda(e.target.value)} placeholder="Poda (días)" />
-        <input className={campo} type="number" value={fert} onChange={(e) => setFert(e.target.value)} placeholder="Fertilización (días)" />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted">Regar cada (días)</label>
+          <input className={campo} type="number" min={1} value={riego} onChange={(e) => setRiego(e.target.value)} placeholder="—" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted">Podar cada (días)</label>
+          <input className={campo} type="number" min={1} value={poda} onChange={(e) => setPoda(e.target.value)} placeholder="—" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted">Fertilizar cada (días)</label>
+          <input className={campo} type="number" min={1} value={fert} onChange={(e) => setFert(e.target.value)} placeholder="—" />
+        </div>
       </div>
+      <p className="text-xs text-muted">
+        La IA lo sugiere automáticamente según la especie al analizar una foto; ajústalo aquí solo si no coincide con lo que tu planta necesita.
+      </p>
       <Button type="submit" disabled={guardando} className="self-start">{guardando ? "Guardando…" : "Guardar cambios"}</Button>
     </form>
   );

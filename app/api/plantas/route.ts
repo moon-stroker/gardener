@@ -13,10 +13,11 @@ export async function GET(request: NextRequest) {
     .where(eq(plantas.activo, ocultas ? 0 : 1));
 
   const conEstado = await Promise.all(
-    filas.map(async (planta) => ({
-      ...planta,
-      estado: ocultas ? null : await estadoDePlanta(planta),
-    }))
+    filas.map(async (planta) => {
+      if (ocultas) return { ...planta, estado: null, motivos: [] };
+      const { estado, motivos } = await estadoDePlanta(planta);
+      return { ...planta, estado, motivos };
+    })
   );
 
   return NextResponse.json(conEstado);
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       especie: (body.especie as string | null) ?? null,
       fechaInicio: typeof body.fechaInicio === "string" ? body.fechaInicio : ahora,
       fotoPortadaUrl: (body.fotoPortadaUrl as string | null) ?? null,
-      reglaRiegoDias: (body.reglaRiegoDias as number | null) ?? 3,
+      reglaRiegoDias: (body.reglaRiegoDias as number | null) ?? null,
       reglaPodaDias: (body.reglaPodaDias as number | null) ?? null,
       reglaFertilizacionDias: (body.reglaFertilizacionDias as number | null) ?? null,
       creadoEn: ahora,

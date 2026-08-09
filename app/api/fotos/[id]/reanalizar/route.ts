@@ -47,15 +47,22 @@ export async function POST(_request: NextRequest, { params }: Params) {
       })
       .returning();
 
+    const cambiosPlanta: Record<string, unknown> = {};
     if (resultado.especieIdentificada) {
-      await db
-        .update(plantas)
-        .set(
-          planta.especie
-            ? { especieSugeridaIa: resultado.especieIdentificada }
-            : { especie: resultado.especieIdentificada, especieSugeridaIa: resultado.especieIdentificada }
-        )
-        .where(eq(plantas.id, planta.id));
+      Object.assign(
+        cambiosPlanta,
+        planta.especie
+          ? { especieSugeridaIa: resultado.especieIdentificada }
+          : { especie: resultado.especieIdentificada, especieSugeridaIa: resultado.especieIdentificada }
+      );
+    }
+    if (planta.reglaRiegoDias == null && resultado.riegoSugeridoDias != null) cambiosPlanta.reglaRiegoDias = resultado.riegoSugeridoDias;
+    if (planta.reglaPodaDias == null && resultado.podaSugeridaDias != null) cambiosPlanta.reglaPodaDias = resultado.podaSugeridaDias;
+    if (planta.reglaFertilizacionDias == null && resultado.fertilizacionSugeridaDias != null) {
+      cambiosPlanta.reglaFertilizacionDias = resultado.fertilizacionSugeridaDias;
+    }
+    if (Object.keys(cambiosPlanta).length > 0) {
+      await db.update(plantas).set(cambiosPlanta).where(eq(plantas.id, planta.id));
     }
 
     return NextResponse.json({ recomendacion, analisis: { estado: "ok" } });

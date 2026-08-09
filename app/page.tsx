@@ -16,6 +16,7 @@ interface PlantaListItem {
   especie: string | null;
   fotoPortadaUrl: string | null;
   estado: Estado;
+  motivos: string[];
 }
 
 const GRUPOS: { estado: Estado; titulo: string; icono: string }[] = [

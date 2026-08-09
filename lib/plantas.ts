@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { bitacora, recomendaciones } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
-import { calcularEstado, type Estado } from "@/lib/semaforo";
+import { calcularEstado, type Estado, type EstadoDetallado } from "@/lib/semaforo";
 
 async function ultimoRegistro(plantaId: string, tipo: string): Promise<string | null> {
   const [row] = await db
@@ -15,21 +15,23 @@ async function ultimoRegistro(plantaId: string, tipo: string): Promise<string | 
 
 export async function estadoDePlanta(planta: {
   id: string;
+  fechaInicio: string;
   reglaRiegoDias: number | null;
   reglaPodaDias: number | null;
   reglaFertilizacionDias: number | null;
-}): Promise<Estado> {
+}): Promise<EstadoDetallado> {
   const [ultimoRiego, ultimaPoda, ultimaFertilizacion, pendientes] = await Promise.all([
     ultimoRegistro(planta.id, "riego"),
     ultimoRegistro(planta.id, "poda"),
     ultimoRegistro(planta.id, "fertilizacion"),
     db
-      .select({ urgencia: recomendaciones.urgencia, fechaSugerida: recomendaciones.fechaSugerida })
+      .select({ texto: recomendaciones.texto, urgencia: recomendaciones.urgencia, fechaSugerida: recomendaciones.fechaSugerida })
       .from(recomendaciones)
       .where(and(eq(recomendaciones.plantaId, planta.id), eq(recomendaciones.atendida, 0))),
   ]);
 
   return calcularEstado({
+    fechaInicio: planta.fechaInicio,
     reglaRiegoDias: planta.reglaRiegoDias,
     reglaPodaDias: planta.reglaPodaDias,
     reglaFertilizacionDias: planta.reglaFertilizacionDias,
@@ -37,6 +39,7 @@ export async function estadoDePlanta(planta: {
     ultimaPoda,
     ultimaFertilizacion,
     recomendacionesPendientes: pendientes.map((p) => ({
+      texto: p.texto,
       urgencia: p.urgencia as Estado | null,
       fechaSugerida: p.fechaSugerida,
     })),

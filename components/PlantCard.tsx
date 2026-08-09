@@ -5,19 +5,24 @@ import type { Estado } from "@/lib/semaforo";
 
 const ETIQUETAS: Record<Estado, string> = { rojo: "Urgente", amarillo: "Pronto", verde: "Al día" };
 
+const COLOR_MOTIVO: Record<Estado, string> = { rojo: "text-rojo", amarillo: "text-amarillo", verde: "text-muted" };
+
 export function PlantCard({
   id,
   nombre,
   especie,
   fotoPortadaUrl,
   estado,
+  motivos,
 }: {
   id: string;
   nombre: string;
   especie: string | null;
   fotoPortadaUrl: string | null;
   estado: Estado | null;
+  motivos?: string[];
 }) {
+  const motivoPrincipal = estado && estado !== "verde" ? motivos?.[0] : undefined;
   return (
     <Link
       href={`/plantas/${id}`}
@@ -48,6 +53,7 @@ export function PlantCard({
       <div className="px-3 py-2.5">
         <p className="truncate text-sm font-bold text-foreground">{nombre}</p>
         <p className="truncate text-xs italic text-muted">{especie ?? "Especie sin identificar"}</p>
+        {motivoPrincipal && <p className={`mt-0.5 truncate text-xs ${COLOR_MOTIVO[estado!]}`}>{motivoPrincipal}</p>}
       </div>
     </Link>
   );

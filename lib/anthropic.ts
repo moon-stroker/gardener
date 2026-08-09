@@ -12,6 +12,9 @@ export interface AnalisisIA {
   tipo: (typeof TIPOS_VALIDOS)[number];
   urgencia: (typeof URGENCIAS_VALIDAS)[number];
   fechaSugerida: string | null;
+  riegoSugeridoDias: number | null;
+  podaSugeridaDias: number | null;
+  fertilizacionSugeridaDias: number | null;
 }
 
 function construirPrompt(especieActual: string | null): string {
@@ -25,6 +28,8 @@ ${
 
 Identifica la especie (nombre común y, si puedes, nombre científico) — no asumas que se trata de un tipo de planta en particular, debe funcionar igual de bien con cualquier especie. Da un diagnóstico breve del estado visible de la planta y UNA recomendación de cuidado accionable.
 
+Además, como experto, sugiere cada cuántos días conviene regar, podar y fertilizar ESTA especie en condiciones típicas de interior/exterior en casa — el usuario no tiene por qué saberlo, es justo lo que te está pidiendo. Si no logras identificar la especie con confianza suficiente para sugerir una frecuencia razonable, usa null en vez de inventar un número.
+
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto antes o después, con exactamente estas claves:
 {
   "especie_identificada": string o null (nombre común),
@@ -32,7 +37,10 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto antes o después, con
   "diagnostico": string (1-2 frases sobre el estado de la planta),
   "tipo": "identificacion" | "poda" | "trasplante" | "propagacion" | "plaga" | "general",
   "urgencia": "rojo" | "amarillo" | "verde",
-  "fecha_sugerida": string o null (fecha ISO YYYY-MM-DD si la acción recomendada tiene una fecha objetivo)
+  "fecha_sugerida": string o null (fecha ISO YYYY-MM-DD si la acción recomendada tiene una fecha objetivo),
+  "riego_sugerido_dias": number o null (cada cuántos días regar esta especie),
+  "poda_sugerida_dias": number o null (cada cuántos días revisar/podar; null si esta especie no suele necesitar poda regular),
+  "fertilizacion_sugerida_dias": number o null (cada cuántos días fertilizar; null si no aplica)
 }`;
 }
 
@@ -51,6 +59,8 @@ function validar(obj: Record<string, unknown>): AnalisisIA {
     throw new Error("'urgencia' inválida en la respuesta de la IA");
   }
 
+  const numeroONulo = (v: unknown): number | null => (typeof v === "number" && !Number.isNaN(v) ? v : null);
+
   return {
     especieIdentificada: (obj.especie_identificada as string) ?? null,
     especieCientifica: (obj.especie_cientifica as string) ?? null,
@@ -58,6 +68,9 @@ function validar(obj: Record<string, unknown>): AnalisisIA {
     tipo: obj.tipo as AnalisisIA["tipo"],
     urgencia: obj.urgencia as AnalisisIA["urgencia"],
     fechaSugerida: (obj.fecha_sugerida as string) ?? null,
+    riegoSugeridoDias: numeroONulo(obj.riego_sugerido_dias),
+    podaSugeridaDias: numeroONulo(obj.poda_sugerida_dias),
+    fertilizacionSugeridaDias: numeroONulo(obj.fertilizacion_sugerida_dias),
   };
 }
 

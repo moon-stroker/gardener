@@ -45,6 +45,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     .values({ id: crypto.randomUUID(), plantaId: id, urlBlob, fecha: ahora, nota })
     .returning();
 
+  await db.update(plantas).set({ fotoPortadaUrl: urlBlob }).where(eq(plantas.id, id));
+
   const { disponible, limite } = await analisisDisponiblesHoy();
   if (!disponible) {
     return NextResponse.json({
@@ -76,15 +78,23 @@ export async function POST(request: NextRequest, { params }: Params) {
       })
       .returning();
 
+    const cambiosPlanta: Record<string, unknown> = {};
     if (resultado.especieIdentificada) {
-      await db
-        .update(plantas)
-        .set(
-          planta.especie
-            ? { especieSugeridaIa: resultado.especieIdentificada }
-            : { especie: resultado.especieIdentificada, especieSugeridaIa: resultado.especieIdentificada }
-        )
-        .where(eq(plantas.id, id));
+      Object.assign(
+        cambiosPlanta,
+        planta.especie
+          ? { especieSugeridaIa: resultado.especieIdentificada }
+          : { especie: resultado.especieIdentificada, especieSugeridaIa: resultado.especieIdentificada }
+      );
+    }
+    // Solo se aplica la sugerencia de la IA si el usuario no ha definido (o ajustado) la regla todavía.
+    if (planta.reglaRiegoDias == null && resultado.riegoSugeridoDias != null) cambiosPlanta.reglaRiegoDias = resultado.riegoSugeridoDias;
+    if (planta.reglaPodaDias == null && resultado.podaSugeridaDias != null) cambiosPlanta.reglaPodaDias = resultado.podaSugeridaDias;
+    if (planta.reglaFertilizacionDias == null && resultado.fertilizacionSugeridaDias != null) {
+      cambiosPlanta.reglaFertilizacionDias = resultado.fertilizacionSugeridaDias;
+    }
+    if (Object.keys(cambiosPlanta).length > 0) {
+      await db.update(plantas).set(cambiosPlanta).where(eq(plantas.id, id));
     }
 
     return NextResponse.json({ foto, recomendacion, analisis: { estado: "ok" } });
