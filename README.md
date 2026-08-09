@@ -34,6 +34,14 @@ npm run db:generate   # genera un nuevo archivo de migración a partir de cambio
 npm run db:migrate    # aplica las migraciones pendientes contra Turso (mismo comando en local y producción)
 ```
 
+### Pruebas
+
+```bash
+npm test
+```
+
+Corre con Vitest: pruebas puras de la lógica de semáforo (`tests/semaforo.test.ts`) y pruebas de integración de las API routes contra la base de Turso real (`tests/api-*.test.ts`, prefijo `__test_*__`, se limpian solas al terminar). La clave de Anthropic no se usa en las pruebas automatizadas — el endpoint de análisis de IA se verifica manualmente (ver Tarea 7.3).
+
 ## Deploy
 
 El proyecto está conectado a Vercel (`monserrat-reyes-projects/gardener`) y a GitHub (`moon-stroker/gardener`) — cada push a `main` dispara un deploy automático.
