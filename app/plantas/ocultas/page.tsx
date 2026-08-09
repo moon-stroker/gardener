@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Topbar } from "@/components/Topbar";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState } from "@/components/ui/ErrorState";
 import { LoadingState } from "@/components/ui/LoadingState";
 
 interface PlantaOculta {
@@ -16,18 +17,33 @@ interface PlantaOculta {
 
 export default function PlantasOcultas() {
   const [plantas, setPlantas] = useState<PlantaOculta[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const cargar = () => {
     fetch("/api/plantas?ocultas=true")
-      .then((r) => r.json())
-      .then(setPlantas);
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data) => {
+        setPlantas(data);
+        setError(null);
+      })
+      .catch(() => setError("No se pudieron cargar las plantas ocultas."));
   };
 
   useEffect(cargar, []);
 
   async function restaurar(id: string) {
+    const anterior = plantas;
     setPlantas((prev) => prev?.filter((p) => p.id !== id) ?? null);
-    await fetch(`/api/plantas/${id}/restaurar`, { method: "POST" });
+    try {
+      const res = await fetch(`/api/plantas/${id}/restaurar`, { method: "POST" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setPlantas(anterior);
+      setError("No se pudo restaurar la planta. Intenta de nuevo.");
+    }
   }
 
   return (
@@ -37,9 +53,11 @@ export default function PlantasOcultas() {
         <h1 className="mb-1 text-xl font-bold tracking-tight">Plantas ocultas</h1>
         <p className="mb-6 text-sm text-muted">Plantas que ocultaste del dashboard principal.</p>
 
-        {plantas === null && <LoadingState />}
+        {error && <div className="mb-4"><ErrorState message={error} onRetry={cargar} /></div>}
 
-        {plantas?.length === 0 && <EmptyState title="No tienes plantas ocultas" />}
+        {!error && plantas === null && <LoadingState />}
+
+        {!error && plantas?.length === 0 && <EmptyState title="No tienes plantas ocultas" />}
 
         <div className="flex flex-col gap-2">
           {plantas?.map((planta) => (

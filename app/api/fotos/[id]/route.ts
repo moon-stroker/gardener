@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { fotos, plantas } from "@/db/schema";
-import { badRequest, notFound } from "@/lib/api";
+import { badRequest, esStringONulo, leerJson, notFound } from "@/lib/api";
 import { del } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
@@ -9,13 +9,14 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
-  const body = await request.json();
+  const body = await leerJson(request);
+  if (!body) return badRequest("El cuerpo de la solicitud debe ser un objeto JSON válido");
 
-  if (!("nota" in body)) {
-    return badRequest("El campo 'nota' es requerido");
+  if (!("nota" in body) || !esStringONulo(body.nota)) {
+    return badRequest("El campo 'nota' es requerido y debe ser texto o null");
   }
 
-  const [actualizada] = await db.update(fotos).set({ nota: body.nota }).where(eq(fotos.id, id)).returning();
+  const [actualizada] = await db.update(fotos).set({ nota: body.nota as string | null }).where(eq(fotos.id, id)).returning();
   if (!actualizada) return notFound("Foto no encontrada");
 
   return NextResponse.json(actualizada);

@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { bitacora, plantas } from "@/db/schema";
-import { badRequest, notFound } from "@/lib/api";
+import { badRequest, esStringONulo, leerJson, notFound } from "@/lib/api";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -10,11 +10,14 @@ const TIPOS_VALIDOS = ["riego", "poda", "fertilizacion", "trasplante", "otro"];
 
 export async function POST(request: NextRequest, { params }: Params) {
   const { id } = await params;
-  const body = await request.json();
+  const body = await leerJson(request);
+  if (!body) return badRequest("El cuerpo de la solicitud debe ser un objeto JSON válido");
 
-  if (!TIPOS_VALIDOS.includes(body.tipo)) {
+  if (!TIPOS_VALIDOS.includes(body.tipo as string)) {
     return badRequest(`El campo 'tipo' debe ser uno de: ${TIPOS_VALIDOS.join(", ")}`);
   }
+  if ("fecha" in body && typeof body.fecha !== "string") return badRequest("'fecha' debe ser texto (ISO)");
+  if ("nota" in body && !esStringONulo(body.nota)) return badRequest("'nota' debe ser texto o null");
 
   const [planta] = await db.select({ id: plantas.id }).from(plantas).where(eq(plantas.id, id));
   if (!planta) return notFound("Planta no encontrada");
@@ -24,9 +27,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     .values({
       id: crypto.randomUUID(),
       plantaId: id,
-      tipo: body.tipo,
-      fecha: body.fecha ?? new Date().toISOString(),
-      nota: body.nota ?? null,
+      tipo: body.tipo as string,
+      fecha: (body.fecha as string) ?? new Date().toISOString(),
+      nota: (body.nota as string | null) ?? null,
     })
     .returning();
 

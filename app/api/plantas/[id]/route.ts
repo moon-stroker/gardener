@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { bitacora, fotos, plantas, recomendaciones } from "@/db/schema";
 import { estadoDePlanta } from "@/lib/plantas";
-import { badRequest, notFound } from "@/lib/api";
+import { badRequest, esNumeroONulo, esStringONulo, leerJson, notFound } from "@/lib/api";
 import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -28,22 +28,26 @@ export async function GET(_request: NextRequest, { params }: Params) {
   });
 }
 
-const CAMPOS_EDITABLES = [
-  "nombre",
-  "especie",
-  "fotoPortadaUrl",
-  "reglaRiegoDias",
-  "reglaPodaDias",
-  "reglaFertilizacionDias",
-] as const;
+const VALIDADORES: Record<string, (v: unknown) => boolean> = {
+  nombre: (v) => typeof v === "string" && v.length > 0,
+  especie: esStringONulo,
+  fotoPortadaUrl: esStringONulo,
+  reglaRiegoDias: esNumeroONulo,
+  reglaPodaDias: esNumeroONulo,
+  reglaFertilizacionDias: esNumeroONulo,
+};
 
 export async function PUT(request: NextRequest, { params }: Params) {
   const { id } = await params;
-  const body = await request.json();
+  const body = await leerJson(request);
+  if (!body) return badRequest("El cuerpo de la solicitud debe ser un objeto JSON válido");
 
   const cambios: Record<string, unknown> = {};
-  for (const campo of CAMPOS_EDITABLES) {
-    if (campo in body) cambios[campo] = body[campo];
+  for (const [campo, validar] of Object.entries(VALIDADORES)) {
+    if (campo in body) {
+      if (!validar(body[campo])) return badRequest(`El campo '${campo}' tiene un valor inválido`);
+      cambios[campo] = body[campo];
+    }
   }
   if (Object.keys(cambios).length === 0) {
     return badRequest("No se envió ningún campo editable");

@@ -70,7 +70,21 @@ export default function PerfilPlanta() {
   const [subiendo, setSubiendo] = useState(false);
   const [mensajeAnalisis, setMensajeAnalisis] = useState<string | null>(null);
   const [editando, setEditando] = useState(false);
+  const [reintentando, setReintentando] = useState<string | null>(null);
   const [nuevoTipoBitacora, setNuevoTipoBitacora] = useState<string>("riego");
+  const [accionError, setAccionError] = useState<string | null>(null);
+
+  async function llamar(url: string, opts?: RequestInit): Promise<Response | null> {
+    try {
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error();
+      setAccionError(null);
+      return res;
+    } catch {
+      setAccionError("No se pudo completar la acción. Revisa tu conexión e intenta de nuevo.");
+      return null;
+    }
+  }
 
   const cargar = () => {
     fetch(`/api/plantas/${id}`)
@@ -138,88 +152,104 @@ export default function PerfilPlanta() {
 
   async function ocultarPlanta() {
     if (!window.confirm(`¿Ocultar "${planta!.nombre}"? Podrás restaurarla después desde "Plantas ocultas".`)) return;
-    await fetch(`/api/plantas/${id}`, { method: "DELETE" });
-    router.push("/");
+    const res = await llamar(`/api/plantas/${id}`, { method: "DELETE" });
+    if (res) router.push("/");
   }
 
   async function editarNotaFoto(foto: Foto) {
     const nota = window.prompt("Nota de la foto:", foto.nota ?? "");
     if (nota === null) return;
-    await fetch(`/api/fotos/${foto.id}`, {
+    const res = await llamar(`/api/fotos/${foto.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nota }),
     });
-    cargar();
+    if (res) cargar();
   }
 
   async function borrarFoto(foto: Foto) {
     if (!window.confirm("¿Borrar esta foto? Esta acción no se puede deshacer.")) return;
-    await fetch(`/api/fotos/${foto.id}`, { method: "DELETE" });
-    cargar();
+    const res = await llamar(`/api/fotos/${foto.id}`, { method: "DELETE" });
+    if (res) cargar();
   }
 
   async function usarComoPortada(foto: Foto) {
-    await fetch(`/api/plantas/${id}`, {
+    const res = await llamar(`/api/plantas/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fotoPortadaUrl: foto.urlBlob }),
     });
-    cargar();
+    if (res) cargar();
   }
 
   async function aceptarEspecieIA() {
-    await fetch(`/api/plantas/${id}`, {
+    const res = await llamar(`/api/plantas/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ especie: planta!.especieSugeridaIa }),
     });
-    cargar();
+    if (res) cargar();
   }
 
   async function agregarBitacora(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const nota = (form.get("nota") as string) || null;
-    await fetch(`/api/plantas/${id}/bitacora`, {
+    const res = await llamar(`/api/plantas/${id}/bitacora`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tipo: nuevoTipoBitacora, nota }),
     });
-    e.currentTarget.reset();
-    cargar();
+    if (res) {
+      e.currentTarget.reset();
+      cargar();
+    }
   }
 
   async function editarBitacora(entrada: Bitacora) {
     const nota = window.prompt("Nota de la bitácora:", entrada.nota ?? "");
     if (nota === null) return;
-    await fetch(`/api/bitacora/${entrada.id}`, {
+    const res = await llamar(`/api/bitacora/${entrada.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nota }),
     });
-    cargar();
+    if (res) cargar();
   }
 
   async function borrarBitacora(entrada: Bitacora) {
     if (!window.confirm("¿Eliminar este registro de bitácora?")) return;
-    await fetch(`/api/bitacora/${entrada.id}`, { method: "DELETE" });
-    cargar();
+    const res = await llamar(`/api/bitacora/${entrada.id}`, { method: "DELETE" });
+    if (res) cargar();
   }
 
   async function marcarAtendida(rec: Recomendacion) {
-    await fetch(`/api/recomendaciones/${rec.id}`, {
+    const res = await llamar(`/api/recomendaciones/${rec.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ atendida: rec.atendida ? 0 : 1 }),
     });
-    cargar();
+    if (res) cargar();
   }
 
   async function descartarRecomendacion(rec: Recomendacion) {
     if (!window.confirm("¿Descartar esta recomendación?")) return;
-    await fetch(`/api/recomendaciones/${rec.id}`, { method: "DELETE" });
-    cargar();
+    const res = await llamar(`/api/recomendaciones/${rec.id}`, { method: "DELETE" });
+    if (res) cargar();
+  }
+
+  async function reintentarAnalisis(foto: Foto) {
+    setReintentando(foto.id);
+    setMensajeAnalisis(null);
+    const res = await llamar(`/api/fotos/${foto.id}/reanalizar`, { method: "POST" });
+    if (res) {
+      const data = await res.json();
+      if (data.analisis?.estado !== "ok") {
+        setMensajeAnalisis(data.analisis?.mensaje ?? "El análisis sigue sin poder completarse.");
+      }
+      cargar();
+    }
+    setReintentando(null);
   }
 
   return (
@@ -229,6 +259,13 @@ export default function PerfilPlanta() {
       </Topbar>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 sm:px-6">
+        {accionError && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-rojo-soft bg-rojo-soft px-3 py-2 text-sm text-rojo">
+            {accionError}
+            <button onClick={() => setAccionError(null)} className="font-semibold">✕</button>
+          </div>
+        )}
+
         <div className="mt-4 grid grid-cols-1 overflow-hidden rounded-lg border border-border sm:grid-cols-[220px_1fr]">
           <div className="relative aspect-4/3 bg-accent-soft sm:aspect-auto sm:min-h-[220px]">
             {planta.fotoPortadaUrl ? (
@@ -310,6 +347,13 @@ export default function PerfilPlanta() {
                     <button onClick={() => editarNotaFoto(foto)} className="font-medium text-accent">Nota</button>
                     <button onClick={() => usarComoPortada(foto)} className="font-medium text-muted">Portada</button>
                     <button onClick={() => borrarFoto(foto)} className="font-medium text-rojo">Borrar</button>
+                    <button
+                      onClick={() => reintentarAnalisis(foto)}
+                      disabled={reintentando === foto.id}
+                      className="font-medium text-amarillo disabled:opacity-50"
+                    >
+                      {reintentando === foto.id ? "Analizando…" : "Reintentar IA"}
+                    </button>
                   </div>
                 </div>
               ))}
