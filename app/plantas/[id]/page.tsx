@@ -1,0 +1,455 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { Topbar } from "@/components/Topbar";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { LoadingState } from "@/components/ui/LoadingState";
+import { EstadoBadge } from "@/components/ui/EstadoBadge";
+import { comprimirImagen } from "@/lib/image";
+import type { Estado } from "@/lib/semaforo";
+
+interface Foto {
+  id: string;
+  urlBlob: string;
+  fecha: string;
+  nota: string | null;
+}
+interface Bitacora {
+  id: string;
+  tipo: string;
+  fecha: string;
+  nota: string | null;
+}
+interface Recomendacion {
+  id: string;
+  texto: string;
+  tipo: string;
+  urgencia: Estado | null;
+  fechaSugerida: string | null;
+  atendida: number;
+}
+interface PlantaDetalle {
+  id: string;
+  nombre: string;
+  especie: string | null;
+  especieSugeridaIa: string | null;
+  fotoPortadaUrl: string | null;
+  reglaRiegoDias: number | null;
+  reglaPodaDias: number | null;
+  reglaFertilizacionDias: number | null;
+  estado: Estado;
+  fotos: Foto[];
+  bitacora: Bitacora[];
+  recomendaciones: Recomendacion[];
+}
+
+const ETIQUETAS: Record<Estado, string> = { rojo: "Urgente", amarillo: "Pronto", verde: "Al día" };
+const FECHA_CORTA = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" });
+const FECHA_LARGA = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric" });
+const TIPOS_BITACORA = ["riego", "poda", "fertilizacion", "trasplante", "otro"] as const;
+const ETIQUETAS_BITACORA: Record<string, string> = {
+  riego: "Riego",
+  poda: "Poda",
+  fertilizacion: "Fertilización",
+  trasplante: "Trasplante",
+  otro: "Otro",
+};
+
+export default function PerfilPlanta() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [planta, setPlanta] = useState<PlantaDetalle | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [mensajeAnalisis, setMensajeAnalisis] = useState<string | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [nuevoTipoBitacora, setNuevoTipoBitacora] = useState<string>("riego");
+
+  const cargar = () => {
+    fetch(`/api/plantas/${id}`)
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data) => {
+        setPlanta(data);
+        setError(null);
+      })
+      .catch(() => setError("No se pudo cargar esta planta."));
+  };
+
+  useEffect(cargar, [id]);
+
+  if (error) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <Topbar />
+        <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10"><ErrorState message={error} onRetry={cargar} /></main>
+      </div>
+    );
+  }
+
+  if (!planta) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <Topbar />
+        <LoadingState label="Cargando planta…" />
+      </div>
+    );
+  }
+
+  async function subirFoto(file: File) {
+    setSubiendo(true);
+    setMensajeAnalisis(null);
+    try {
+      const comprimida = await comprimirImagen(file);
+      const formData = new FormData();
+      formData.append("file", comprimida);
+      const res = await fetch(`/api/plantas/${id}/foto`, { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error();
+
+      setPlanta((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          fotos: [data.foto, ...prev.fotos],
+          recomendaciones: data.recomendacion ? [data.recomendacion, ...prev.recomendaciones] : prev.recomendaciones,
+          especieSugeridaIa: prev.especieSugeridaIa,
+        };
+      });
+      if (data.analisis?.estado !== "ok") {
+        setMensajeAnalisis(data.analisis?.mensaje ?? null);
+      }
+      cargar();
+    } catch {
+      setMensajeAnalisis("No se pudo subir la foto. Intenta de nuevo.");
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  async function ocultarPlanta() {
+    if (!window.confirm(`¿Ocultar "${planta!.nombre}"? Podrás restaurarla después desde "Plantas ocultas".`)) return;
+    await fetch(`/api/plantas/${id}`, { method: "DELETE" });
+    router.push("/");
+  }
+
+  async function editarNotaFoto(foto: Foto) {
+    const nota = window.prompt("Nota de la foto:", foto.nota ?? "");
+    if (nota === null) return;
+    await fetch(`/api/fotos/${foto.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nota }),
+    });
+    cargar();
+  }
+
+  async function borrarFoto(foto: Foto) {
+    if (!window.confirm("¿Borrar esta foto? Esta acción no se puede deshacer.")) return;
+    await fetch(`/api/fotos/${foto.id}`, { method: "DELETE" });
+    cargar();
+  }
+
+  async function usarComoPortada(foto: Foto) {
+    await fetch(`/api/plantas/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fotoPortadaUrl: foto.urlBlob }),
+    });
+    cargar();
+  }
+
+  async function aceptarEspecieIA() {
+    await fetch(`/api/plantas/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ especie: planta!.especieSugeridaIa }),
+    });
+    cargar();
+  }
+
+  async function agregarBitacora(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const nota = (form.get("nota") as string) || null;
+    await fetch(`/api/plantas/${id}/bitacora`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: nuevoTipoBitacora, nota }),
+    });
+    e.currentTarget.reset();
+    cargar();
+  }
+
+  async function editarBitacora(entrada: Bitacora) {
+    const nota = window.prompt("Nota de la bitácora:", entrada.nota ?? "");
+    if (nota === null) return;
+    await fetch(`/api/bitacora/${entrada.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nota }),
+    });
+    cargar();
+  }
+
+  async function borrarBitacora(entrada: Bitacora) {
+    if (!window.confirm("¿Eliminar este registro de bitácora?")) return;
+    await fetch(`/api/bitacora/${entrada.id}`, { method: "DELETE" });
+    cargar();
+  }
+
+  async function marcarAtendida(rec: Recomendacion) {
+    await fetch(`/api/recomendaciones/${rec.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ atendida: rec.atendida ? 0 : 1 }),
+    });
+    cargar();
+  }
+
+  async function descartarRecomendacion(rec: Recomendacion) {
+    if (!window.confirm("¿Descartar esta recomendación?")) return;
+    await fetch(`/api/recomendaciones/${rec.id}`, { method: "DELETE" });
+    cargar();
+  }
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <Topbar>
+        <Button variant="ghost" onClick={ocultarPlanta}>Ocultar planta</Button>
+      </Topbar>
+
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 sm:px-6">
+        <div className="mt-4 grid grid-cols-1 overflow-hidden rounded-lg border border-border sm:grid-cols-[220px_1fr]">
+          <div className="relative aspect-4/3 bg-accent-soft sm:aspect-auto sm:min-h-[220px]">
+            {planta.fotoPortadaUrl ? (
+              <Image src={planta.fotoPortadaUrl} alt={planta.nombre} fill sizes="220px" className="object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center text-accent/60">
+                <svg viewBox="0 0 24 24" fill="none" className="size-10">
+                  <path d="M12 2C8 6 6 10 6 13a6 6 0 0 0 12 0c0-3-2-7-6-11Z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3.5 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold tracking-tight text-balance">{planta.nombre}</h1>
+                <p className="italic text-muted">{planta.especie ?? "Especie sin identificar"}</p>
+              </div>
+              <EstadoBadge estado={planta.estado} label={ETIQUETAS[planta.estado]} size="md" />
+            </div>
+
+            {planta.especieSugeridaIa && planta.especieSugeridaIa !== planta.especie && (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-accent/25 bg-accent-soft px-3 py-2 text-sm">
+                <span>
+                  La IA identificó esto como <strong className="text-accent">{planta.especieSugeridaIa}</strong> ¿corregir?
+                </span>
+                <button onClick={aceptarEspecieIA} className="flex-none text-sm font-semibold text-accent underline underline-offset-2">
+                  Aceptar
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <Regla etiqueta="Riego cada" valor={planta.reglaRiegoDias} sufijo="días" />
+              <Regla etiqueta="Poda cada" valor={planta.reglaPodaDias} sufijo="días" />
+              <Regla etiqueta="Fertilizar cada" valor={planta.reglaFertilizacionDias} sufijo="días" />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) subirFoto(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button onClick={() => fileRef.current?.click()} disabled={subiendo}>
+                {subiendo ? "Analizando…" : "Subir foto y analizar"}
+              </Button>
+              <Button variant="ghost" onClick={() => setEditando((v) => !v)}>
+                {editando ? "Cerrar edición" : "Editar datos"}
+              </Button>
+            </div>
+
+            {subiendo && <LoadingState label="La IA está analizando la foto…" />}
+            {mensajeAnalisis && <p className="text-sm text-amarillo">{mensajeAnalisis}</p>}
+
+            {editando && <EditarPlantaForm planta={planta} onGuardado={() => { setEditando(false); cargar(); }} />}
+          </div>
+        </div>
+
+        <Seccion titulo="Línea de tiempo">
+          {planta.fotos.length === 0 ? (
+            <EmptyState title="Todavía no hay fotos" description="Sube la primera foto para empezar la línea de tiempo." />
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {planta.fotos.map((foto) => (
+                <div key={foto.id} className="group w-24 flex-none sm:w-28">
+                  <div className="relative aspect-square overflow-hidden rounded-md border border-border">
+                    <Image src={foto.urlBlob} alt={foto.nota ?? "Foto de la planta"} fill sizes="112px" className="object-cover" />
+                  </div>
+                  <p className="mt-1 text-xs tabular-nums text-muted">{FECHA_CORTA.format(new Date(foto.fecha))}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
+                    <button onClick={() => editarNotaFoto(foto)} className="font-medium text-accent">Nota</button>
+                    <button onClick={() => usarComoPortada(foto)} className="font-medium text-muted">Portada</button>
+                    <button onClick={() => borrarFoto(foto)} className="font-medium text-rojo">Borrar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Seccion>
+
+        <Seccion titulo="Recomendaciones">
+          {planta.recomendaciones.length === 0 ? (
+            <EmptyState title="Sin recomendaciones todavía" description="Sube una foto para recibir un diagnóstico de la IA." />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {planta.recomendaciones.map((rec) => (
+                <div key={rec.id} className={`flex items-start gap-3 rounded-md border border-border p-3 ${rec.atendida ? "opacity-50" : ""}`}>
+                  {rec.urgencia && <EstadoBadge estado={rec.urgencia} label="" size="sm" />}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm">{rec.texto}</p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {ETIQUETAS_BITACORA[rec.tipo] ?? rec.tipo}
+                      {rec.fechaSugerida && ` · sugerida para ${FECHA_LARGA.format(new Date(rec.fechaSugerida))}`}
+                    </p>
+                  </div>
+                  <div className="flex flex-none flex-col items-end gap-1 text-xs">
+                    <button onClick={() => marcarAtendida(rec)} className="font-semibold text-accent">
+                      {rec.atendida ? "Reabrir" : "Marcar atendida"}
+                    </button>
+                    <button onClick={() => descartarRecomendacion(rec)} className="font-medium text-muted">Descartar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Seccion>
+
+        <Seccion titulo="Bitácora">
+          <form onSubmit={agregarBitacora} className="mb-3 flex flex-wrap items-center gap-2">
+            <select
+              value={nuevoTipoBitacora}
+              onChange={(e) => setNuevoTipoBitacora(e.target.value)}
+              className="rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm"
+            >
+              {TIPOS_BITACORA.map((t) => (
+                <option key={t} value={t}>{ETIQUETAS_BITACORA[t]}</option>
+              ))}
+            </select>
+            <input
+              name="nota"
+              placeholder="Nota (opcional)"
+              className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm"
+            />
+            <Button type="submit" variant="ghost">Registrar</Button>
+          </form>
+
+          {planta.bitacora.length === 0 ? (
+            <EmptyState title="Sin registros de bitácora" />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {planta.bitacora.map((b) => (
+                <div key={b.id} className="flex items-start gap-3 rounded-md border border-border p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">{ETIQUETAS_BITACORA[b.tipo] ?? b.tipo}</p>
+                    {b.nota && <p className="text-sm text-muted">{b.nota}</p>}
+                    <p className="mt-0.5 text-xs tabular-nums text-muted">{FECHA_LARGA.format(new Date(b.fecha))}</p>
+                  </div>
+                  <div className="flex flex-none gap-2 text-xs">
+                    <button onClick={() => editarBitacora(b)} className="font-semibold text-accent">Editar</button>
+                    <button onClick={() => borrarBitacora(b)} className="font-medium text-rojo">Borrar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Seccion>
+
+        <div className="mt-8">
+          <Link href="/" className="text-sm font-medium text-muted underline underline-offset-2">← Volver al dashboard</Link>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function Regla({ etiqueta, valor, sufijo }: { etiqueta: string; valor: number | null; sufijo: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[11px] font-medium tracking-wide text-muted uppercase">{etiqueta}</span>
+      <span className="text-sm font-semibold tabular-nums">{valor ? `${valor} ${sufijo}` : "—"}</span>
+    </div>
+  );
+}
+
+function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-8">
+      <h2 className="mb-3 text-sm font-bold tracking-tight">{titulo}</h2>
+      {children}
+    </section>
+  );
+}
+
+function EditarPlantaForm({ planta, onGuardado }: { planta: PlantaDetalle; onGuardado: () => void }) {
+  const [nombre, setNombre] = useState(planta.nombre);
+  const [especie, setEspecie] = useState(planta.especie ?? "");
+  const [riego, setRiego] = useState(String(planta.reglaRiegoDias ?? ""));
+  const [poda, setPoda] = useState(String(planta.reglaPodaDias ?? ""));
+  const [fert, setFert] = useState(String(planta.reglaFertilizacionDias ?? ""));
+  const [guardando, setGuardando] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setGuardando(true);
+    await fetch(`/api/plantas/${planta.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre,
+        especie: especie.trim() || null,
+        reglaRiegoDias: riego ? Number(riego) : null,
+        reglaPodaDias: poda ? Number(poda) : null,
+        reglaFertilizacionDias: fert ? Number(fert) : null,
+      }),
+    });
+    setGuardando(false);
+    onGuardado();
+  }
+
+  const campo = "w-full rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm";
+
+  return (
+    <form onSubmit={onSubmit} className="mt-1 flex flex-col gap-3 rounded-md border border-border p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <input className={campo} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" />
+        <input className={campo} value={especie} onChange={(e) => setEspecie(e.target.value)} placeholder="Especie" />
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <input className={campo} type="number" value={riego} onChange={(e) => setRiego(e.target.value)} placeholder="Riego (días)" />
+        <input className={campo} type="number" value={poda} onChange={(e) => setPoda(e.target.value)} placeholder="Poda (días)" />
+        <input className={campo} type="number" value={fert} onChange={(e) => setFert(e.target.value)} placeholder="Fertilización (días)" />
+      </div>
+      <Button type="submit" disabled={guardando} className="self-start">{guardando ? "Guardando…" : "Guardar cambios"}</Button>
+    </form>
+  );
+}

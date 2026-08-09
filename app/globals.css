@@ -1,26 +1,74 @@
 @import "tailwindcss";
 
 :root {
+  /* Vivero minimalista: mucho blanco, tipografía limpia, acento verde vivo */
   --background: #ffffff;
-  --foreground: #171717;
+  --surface: #fafaf9;
+  --foreground: #1c1c1a;
+  --muted: #6b6b65;
+  --border: #e5e5e0;
+
+  --accent: #2f6b4f;
+  --accent-soft: #e8f3ec;
+
+  --rojo: #dc4c3e;
+  --rojo-soft: #fbeae8;
+  --amarillo: #c98a1a;
+  --amarillo-soft: #fbf1de;
+  --verde: #3f8a5c;
+  --verde-soft: #e8f3ec;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-rojo: var(--rojo);
+  --color-rojo-soft: var(--rojo-soft);
+  --color-amarillo: var(--amarillo);
+  --color-amarillo-soft: var(--amarillo-soft);
+  --color-verde: var(--verde);
+  --color-verde-soft: var(--verde-soft);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #121210;
+    --surface: #1a1a17;
+    --foreground: #f2f2ee;
+    --muted: #9a9a92;
+    --border: #2c2c28;
+
+    --accent: #5cb583;
+    --accent-soft: #1c2e23;
+
+    --rojo: #ef6b5d;
+    --rojo-soft: #33201d;
+    --amarillo: #e0ab3f;
+    --amarillo-soft: #362a13;
+    --verde: #5cb583;
+    --verde-soft: #1c2e23;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
