@@ -26,7 +26,9 @@ ${
     : "El usuario no ha registrado la especie de esta planta todavía."
 }
 
-Identifica la especie (nombre común y, si puedes, nombre científico) — no asumas que se trata de un tipo de planta en particular, debe funcionar igual de bien con cualquier especie. Da un diagnóstico breve del estado visible de la planta y UNA recomendación de cuidado accionable.
+Identifica la especie (nombre común y, si puedes, nombre científico) — no asumas que se trata de un tipo de planta en particular, debe funcionar igual de bien con cualquier especie.
+
+El campo "diagnostico" NO debe ser solo una observación — tiene que terminar en una instrucción concreta y verificable que el usuario pueda marcar como hecha. No basta con nombrar un problema ("exceso de humedad"); di qué hacer al respecto y, si aplica, por cuánto tiempo o hasta qué señal ("no vuelvas a regar hasta que los primeros 3cm de tierra estén secos al tacto, probablemente en 5-7 días" es accionable; "hay exceso de humedad" no lo es). Máximo 2 frases: una de diagnóstico, una de acción concreta.
 
 Además, como experto, sugiere cada cuántos días conviene regar, podar y fertilizar ESTA especie en condiciones típicas de interior/exterior en casa — el usuario no tiene por qué saberlo, es justo lo que te está pidiendo. Si no logras identificar la especie con confianza suficiente para sugerir una frecuencia razonable, usa null en vez de inventar un número.
 
@@ -34,7 +36,7 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto antes o después, con
 {
   "especie_identificada": string o null (nombre común),
   "especie_cientifica": string o null,
-  "diagnostico": string (1-2 frases sobre el estado de la planta),
+  "diagnostico": string (1-2 frases: qué observas + qué acción concreta debe tomar el usuario),
   "tipo": "identificacion" | "poda" | "trasplante" | "propagacion" | "plaga" | "general",
   "urgencia": "rojo" | "amarillo" | "verde",
   "fecha_sugerida": string o null (fecha ISO YYYY-MM-DD si la acción recomendada tiene una fecha objetivo),

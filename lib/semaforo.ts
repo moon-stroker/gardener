@@ -40,12 +40,22 @@ function evaluarRegla(
   return { estado: dias <= reglaDias * 1.5 ? "amarillo" : "rojo", motivo };
 }
 
+// Resumen corto para no repetir el texto completo de la recomendación (ya se ve entero en la tarjeta de Recomendaciones).
+function resumen(texto: string, maxLargo = 90): string {
+  if (texto.length <= maxLargo) return texto;
+  const corte = texto.slice(0, maxLargo);
+  const ultimoEspacio = corte.lastIndexOf(" ");
+  return `${corte.slice(0, ultimoEspacio > 0 ? ultimoEspacio : maxLargo)}…`;
+}
+
 // Fecha ya vencida o a menos de 3 días → escala el semáforo. Más lejana → no participa todavía.
 function evaluarFechaSugerida(fechaSugerida: string | null, texto: string, ahora: Date): Senal | null {
   if (!fechaSugerida) return null;
   const diasHasta = Math.floor((new Date(fechaSugerida).getTime() - ahora.getTime()) / 86_400_000);
-  if (diasHasta <= 0) return { estado: "rojo", motivo: `Fecha sugerida por la IA vencida: ${texto}` };
-  if (diasHasta <= 3) return { estado: "amarillo", motivo: `Fecha sugerida por la IA en ${diasHasta} día${diasHasta === 1 ? "" : "s"}: ${texto}` };
+  if (diasHasta <= 0) return { estado: "rojo", motivo: `Fecha sugerida por la IA vencida: ${resumen(texto)}` };
+  if (diasHasta <= 3) {
+    return { estado: "amarillo", motivo: `Fecha sugerida por la IA en ${diasHasta} día${diasHasta === 1 ? "" : "s"}: ${resumen(texto)}` };
+  }
   return null;
 }
 
@@ -80,7 +90,7 @@ export function calcularEstado(input: CalcularEstadoInput, ahora: Date = new Dat
 
   for (const r of input.recomendacionesPendientes) {
     if (r.urgencia && r.urgencia !== "verde") {
-      señales.push({ estado: r.urgencia, motivo: `Recomendación de la IA pendiente: ${r.texto}` });
+      señales.push({ estado: r.urgencia, motivo: `La IA recomienda: ${resumen(r.texto)}` });
     }
     señales.push(evaluarFechaSugerida(r.fechaSugerida, r.texto, ahora));
   }

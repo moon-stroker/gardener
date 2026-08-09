@@ -87,7 +87,19 @@ describe("calcularEstado — recomendaciones de IA pendientes", () => {
       AHORA
     );
     expect(estado).toBe("rojo");
-    expect(motivos[0]).toMatch(/riega pronto/);
+    expect(motivos[0]).toBe("La IA recomienda: riega pronto");
+  });
+
+  it("recorta el texto largo de una recomendación en vez de repetirlo completo", () => {
+    const textoLargo =
+      "La planta muestra hojas sanas con variegación amarilla característica. El medidor indica nivel de humedad en zona húmeda-mojada, lo que puede ser excesivo para esta especie suculenta que prefiere suelo seco entre riegos.";
+    const { motivos } = calcularEstado(
+      { ...BASE, recomendacionesPendientes: [{ texto: textoLargo, urgencia: "amarillo", fechaSugerida: null }] },
+      AHORA
+    );
+    expect(motivos[0].startsWith("La IA recomienda: ")).toBe(true);
+    expect(motivos[0].length).toBeLessThan(textoLargo.length);
+    expect(motivos[0].endsWith("…")).toBe(true);
   });
 
   it("una recomendación verde no genera señal (no hay nada urgente que reportar)", () => {
@@ -138,7 +150,7 @@ describe("calcularEstado — varias condiciones compiten, gana la peor", () => {
       AHORA
     );
     expect(estado).toBe("rojo");
-    expect(motivos).toEqual(["Recomendación de la IA pendiente: plaga detectada"]);
+    expect(motivos).toEqual(["La IA recomienda: plaga detectada"]);
   });
 
   it("riego verde + poda amarilla, sin nada rojo => amarillo (la peor entre las dos)", () => {
