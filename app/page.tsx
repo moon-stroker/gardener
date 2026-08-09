@@ -45,6 +45,17 @@ export default function Dashboard() {
 
   const urgentes = plantas?.filter((p) => p.estado === "rojo").length ?? 0;
 
+  async function exportarDatos() {
+    const res = await fetch("/api/exportar");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mis-plantas-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <Topbar>
@@ -109,10 +120,13 @@ export default function Dashboard() {
           })}
 
         {!error && plantas && plantas.length > 0 && (
-          <div className="mt-10 text-center">
+          <div className="mt-10 flex flex-col items-center gap-2 text-center">
             <Link href="/plantas/ocultas" className="text-sm font-medium text-muted underline underline-offset-2">
               Ver plantas ocultas
             </Link>
+            <button onClick={exportarDatos} className="text-sm font-medium text-muted underline underline-offset-2">
+              Exportar mis datos (JSON)
+            </button>
           </div>
         )}
       </main>
