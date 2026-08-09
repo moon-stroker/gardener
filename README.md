@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Asesor y Tracker de Plantas
 
-## Getting Started
+Aplicación web personal para llevar el control visual del crecimiento de cada planta, con un asesor de IA que analiza fotos y da recomendaciones de cuidado. Ver el documento de diseño original para el detalle completo de arquitectura y alcance.
 
-First, run the development server:
+**Stack:** Next.js (App Router, frontend + API routes en un solo proyecto) · Vercel (hosting) · Turso/libSQL (base de datos, vía Drizzle ORM) · Vercel Blob (fotos) · Anthropic API (análisis de imágenes).
+
+## Desarrollo local
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Esto levanta frontend y backend juntos en [http://localhost:3000](http://localhost:3000) (comportamiento nativo de Next.js — no hay servidor separado que levantar). La conexión a Turso se toma de `.env.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Variables de entorno
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copia `.env.local` (no versionado) con estas variables. En Vercel ya están configuradas para Production/Preview/Development vía `vercel env add`.
 
-## Learn More
+| Variable | Qué es | De dónde sale |
+|---|---|---|
+| `TURSO_DATABASE_URL` | URL de conexión a la base de datos libSQL | `turso db show gardener --url` |
+| `TURSO_AUTH_TOKEN` | Token de autenticación de la base de datos | `turso db tokens create gardener` |
+| `BLOB_READ_WRITE_TOKEN` | Token para subir/leer archivos en Vercel Blob | Generado automáticamente al correr `vercel blob create-store` y enlazado al proyecto |
+| `ANTHROPIC_API_KEY` | Clave de la API de Anthropic para el análisis de fotos | [console.anthropic.com](https://console.anthropic.com) → API Keys (pendiente de configurar) |
+| `VERCEL_OIDC_TOKEN` | Token interno que gestiona el propio CLI de Vercel | Generado automáticamente, no tocar |
 
-To learn more about Next.js, take a look at the following resources:
+### Base de datos (migraciones versionadas)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+El esquema vive en [`db/schema.ts`](db/schema.ts) usando Drizzle ORM. Las migraciones generadas están en `drizzle/`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run db:generate   # genera un nuevo archivo de migración a partir de cambios en db/schema.ts
+npm run db:migrate    # aplica las migraciones pendientes contra Turso (mismo comando en local y producción)
+```
 
-## Deploy on Vercel
+## Deploy
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+El proyecto está conectado a Vercel (`monserrat-reyes-projects/gardener`) y a GitHub (`moon-stroker/gardener`) — cada push a `main` dispara un deploy automático.
