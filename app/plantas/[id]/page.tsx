@@ -262,6 +262,8 @@ export default function PerfilPlanta() {
     setReintentando(null);
   }
 
+  const hayRecomendacionPendiente = planta.recomendaciones.some((r) => !r.atendida && r.urgencia && r.urgencia !== "verde");
+
   return (
     <div className="flex flex-1 flex-col">
       <Topbar>
@@ -322,11 +324,18 @@ export default function PerfilPlanta() {
             )}
 
             {planta.estado !== "verde" && planta.motivos.length > 0 && (
-              <ul className={`flex flex-col gap-1 rounded-md border px-3 py-2 text-sm ${planta.estado === "rojo" ? "border-rojo-soft bg-rojo-soft text-rojo" : "border-amarillo-soft bg-amarillo-soft text-amarillo"}`}>
-                {planta.motivos.map((motivo) => (
-                  <li key={motivo}>{motivo}</li>
-                ))}
-              </ul>
+              <div className={`rounded-md border px-3 py-2 text-sm ${planta.estado === "rojo" ? "border-rojo-soft bg-rojo-soft text-rojo" : "border-amarillo-soft bg-amarillo-soft text-amarillo"}`}>
+                <ul className="flex flex-col gap-1">
+                  {planta.motivos.map((motivo) => (
+                    <li key={motivo}>{motivo}</li>
+                  ))}
+                </ul>
+                {hayRecomendacionPendiente && (
+                  <a href="#recomendaciones" className="mt-1 inline-block font-semibold underline underline-offset-2">
+                    ↓ Ir a Recomendaciones para marcarla como atendida
+                  </a>
+                )}
+              </div>
             )}
 
             <div className="flex flex-wrap gap-2">
@@ -394,7 +403,7 @@ export default function PerfilPlanta() {
           )}
         </Seccion>
 
-        <Seccion titulo="Recomendaciones">
+        <Seccion id="recomendaciones" titulo="Recomendaciones">
           {planta.recomendaciones.length === 0 ? (
             <EmptyState title="Sin recomendaciones todavía" description="Sube una foto para recibir un diagnóstico de la IA." />
           ) : (
@@ -478,9 +487,9 @@ function Regla({ etiqueta, valor, sufijo }: { etiqueta: string; valor: number | 
   );
 }
 
-function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Seccion({ id, titulo, children }: { id?: string; titulo: string; children: React.ReactNode }) {
   return (
-    <section className="mt-8">
+    <section id={id} className="mt-8 scroll-mt-4">
       <h2 className="mb-3 text-sm font-bold tracking-tight">{titulo}</h2>
       {children}
     </section>
