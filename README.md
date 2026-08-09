@@ -22,7 +22,7 @@ Copia `.env.local` (no versionado) con estas variables. En Vercel ya están conf
 | `TURSO_DATABASE_URL` | URL de conexión a la base de datos libSQL | `turso db show gardener --url` |
 | `TURSO_AUTH_TOKEN` | Token de autenticación de la base de datos | `turso db tokens create gardener` |
 | `BLOB_READ_WRITE_TOKEN` | Token para subir/leer archivos en Vercel Blob | Generado automáticamente al correr `vercel blob create-store` y enlazado al proyecto |
-| `ANTHROPIC_API_KEY` | Clave de la API de Anthropic para el análisis de fotos | [console.anthropic.com](https://console.anthropic.com) → API Keys (pendiente de configurar) |
+| `ANTHROPIC_API_KEY` | Clave de la API de Anthropic para el análisis de fotos | [console.anthropic.com](https://console.anthropic.com) → API Keys |
 | `VERCEL_OIDC_TOKEN` | Token interno que gestiona el propio CLI de Vercel | Generado automáticamente, no tocar |
 
 ### Base de datos (migraciones versionadas)
@@ -45,3 +45,7 @@ Corre con Vitest: pruebas puras de la lógica de semáforo (`tests/semaforo.test
 ## Deploy
 
 El proyecto está conectado a Vercel (`monserrat-reyes-projects/gardener`) y a GitHub (`moon-stroker/gardener`) — cada push a `main` dispara un deploy automático.
+
+**URL pública:** https://gardener-monserrat-reyes-projects.vercel.app
+
+> Por defecto Vercel activa "Deployment Protection" (pide login de Vercel antes de mostrar la app), lo cual contradice que esta app deba ser pública sin autenticación (ver sección "Acceso" del documento de diseño). Debe estar **Disabled** en Project Settings → Deployment Protection.
