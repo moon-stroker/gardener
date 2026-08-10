@@ -3,6 +3,7 @@ import { fotos, plantas, recomendaciones } from "@/db/schema";
 import { badRequest, notFound, serverError } from "@/lib/api";
 import { analizarFoto } from "@/lib/anthropic";
 import { analisisDisponiblesHoy } from "@/lib/rate-limit";
+import { descartarRecomendacionesPendientes } from "@/lib/plantas";
 import { put } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
@@ -62,6 +63,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const resultado = await analizarFoto(buffer.toString("base64"), file.type, planta.especie);
+
+    await descartarRecomendacionesPendientes(id);
 
     const [recomendacion] = await db
       .insert(recomendaciones)

@@ -3,6 +3,7 @@ import { fotos, plantas, recomendaciones } from "@/db/schema";
 import { notFound } from "@/lib/api";
 import { analizarFoto } from "@/lib/anthropic";
 import { analisisDisponiblesHoy } from "@/lib/rate-limit";
+import { descartarRecomendacionesPendientes } from "@/lib/plantas";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -31,6 +32,8 @@ export async function POST(_request: NextRequest, { params }: Params) {
     const buffer = Buffer.from(await respuestaBlob.arrayBuffer());
 
     const resultado = await analizarFoto(buffer.toString("base64"), mediaType, planta.especie);
+
+    await descartarRecomendacionesPendientes(planta.id);
 
     const [recomendacion] = await db
       .insert(recomendaciones)

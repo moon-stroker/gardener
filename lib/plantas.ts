@@ -13,6 +13,15 @@ async function ultimoRegistro(plantaId: string, tipo: string): Promise<string | 
   return row?.fecha ?? null;
 }
 
+// Un análisis nuevo reemplaza al anterior en vez de acumularse: las recomendaciones
+// pendientes previas se marcan atendidas (quedan en el historial, ya no en la lista activa).
+export async function descartarRecomendacionesPendientes(plantaId: string): Promise<void> {
+  await db
+    .update(recomendaciones)
+    .set({ atendida: 1 })
+    .where(and(eq(recomendaciones.plantaId, plantaId), eq(recomendaciones.atendida, 0)));
+}
+
 export async function estadoDePlanta(planta: {
   id: string;
   fechaInicio: string;
