@@ -39,12 +39,12 @@ export async function POST(_request: NextRequest, { params }: Params) {
 
     const cambiosPlanta: Record<string, unknown> = {};
     if (resultado.especieIdentificada) {
-      Object.assign(
-        cambiosPlanta,
-        planta.especie
-          ? { especieSugeridaIa: resultado.especieIdentificada }
-          : { especie: resultado.especieIdentificada, especieSugeridaIa: resultado.especieIdentificada }
-      );
+      if (!planta.especie) {
+        cambiosPlanta.especie = resultado.especieIdentificada;
+        cambiosPlanta.especieSugeridaIa = resultado.especieIdentificada;
+      } else if (!resultado.especieCoincide) {
+        cambiosPlanta.especieSugeridaIa = resultado.especieIdentificada;
+      }
     }
     if (planta.reglaRiegoDias == null && resultado.riegoSugeridoDias != null) cambiosPlanta.reglaRiegoDias = resultado.riegoSugeridoDias;
     if (planta.reglaPodaDias == null && resultado.podaSugeridaDias != null) cambiosPlanta.reglaPodaDias = resultado.podaSugeridaDias;

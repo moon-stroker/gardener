@@ -69,12 +69,14 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const cambiosPlanta: Record<string, unknown> = {};
     if (resultado.especieIdentificada) {
-      Object.assign(
-        cambiosPlanta,
-        planta.especie
-          ? { especieSugeridaIa: resultado.especieIdentificada }
-          : { especie: resultado.especieIdentificada, especieSugeridaIa: resultado.especieIdentificada }
-      );
+      if (!planta.especie) {
+        cambiosPlanta.especie = resultado.especieIdentificada;
+        cambiosPlanta.especieSugeridaIa = resultado.especieIdentificada;
+      } else if (!resultado.especieCoincide) {
+        // Genuinamente distinta de lo registrado -> avisar. Si coincide (aunque con otra redacción), no tocar
+        // especie_sugerida_ia para no disparar un aviso falso cada vez que la IA redacta el nombre distinto.
+        cambiosPlanta.especieSugeridaIa = resultado.especieIdentificada;
+      }
     }
     // Solo se aplica la sugerencia de la IA si el usuario no ha definido (o ajustado) la regla todavía.
     if (planta.reglaRiegoDias == null && resultado.riegoSugeridoDias != null) cambiosPlanta.reglaRiegoDias = resultado.riegoSugeridoDias;

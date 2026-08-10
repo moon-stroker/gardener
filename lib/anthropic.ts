@@ -15,6 +15,7 @@ export interface AnalisisAspecto {
 export interface AnalisisIA {
   especieIdentificada: string | null;
   especieCientifica: string | null;
+  especieCoincide: boolean;
   riegoSugeridoDias: number | null;
   podaSugeridaDias: number | null;
   fertilizacionSugeridaDias: number | null;
@@ -26,7 +27,7 @@ function construirPrompt(especieActual: string | null): string {
 
 ${
   especieActual
-    ? `El usuario ya registró la especie como "${especieActual}". Confirma o corrige tu identificación de todas formas.`
+    ? `El usuario ya registró la especie como "${especieActual}". Identifica la especie de todas formas y determina si tu identificación se refiere a LA MISMA especie que la registrada — no compares el texto literal, compara el significado: "Aretillo (Fuchsia)", "Aretillo o Fucsia" y "Fuchsia" son la MISMA especie con distinta redacción, eso SÍ coincide. Solo marca que no coincide si es una especie genuinamente distinta.`
     : "El usuario no ha registrado la especie de esta planta todavía."
 }
 
@@ -43,6 +44,7 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto antes o después, con
 {
   "especie_identificada": string o null (nombre común),
   "especie_cientifica": string o null,
+  "especie_coincide": true o false (${especieActual ? `¿tu identificación es la misma especie que "${especieActual}", aunque esté redactada distinto?` : "usa true, no hay especie registrada con qué comparar"}),
   "riego_sugerido_dias": number o null (cada cuántos días regar esta especie),
   "poda_sugerida_dias": number o null (cada cuántos días revisar/podar; null si esta especie no suele necesitar poda regular),
   "fertilizacion_sugerida_dias": number o null (cada cuántos días fertilizar; null si no aplica),
@@ -85,6 +87,7 @@ function validar(obj: Record<string, unknown>): AnalisisIA {
   return {
     especieIdentificada: (obj.especie_identificada as string) ?? null,
     especieCientifica: (obj.especie_cientifica as string) ?? null,
+    especieCoincide: obj.especie_coincide !== false,
     riegoSugeridoDias: numeroONulo(obj.riego_sugerido_dias),
     podaSugeridaDias: numeroONulo(obj.poda_sugerida_dias),
     fertilizacionSugeridaDias: numeroONulo(obj.fertilizacion_sugerida_dias),
