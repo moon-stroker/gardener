@@ -373,7 +373,9 @@ export default function PerfilPlanta() {
             {subiendo && <LoadingState label="La IA está analizando la foto…" />}
             {mensajeAnalisis && <p className="text-sm text-amarillo">{mensajeAnalisis}</p>}
 
-            {editando && <EditarPlantaForm planta={planta} onGuardado={() => { setEditando(false); cargar(); }} />}
+            {editando && (
+              <EditarPlantaForm planta={planta} llamar={llamar} onGuardado={() => { setEditando(false); cargar(); }} />
+            )}
           </div>
         </div>
 
@@ -499,18 +501,28 @@ function Seccion({ id, titulo, children }: { id?: string; titulo: string; childr
   );
 }
 
-function EditarPlantaForm({ planta, onGuardado }: { planta: PlantaDetalle; onGuardado: () => void }) {
+function EditarPlantaForm({
+  planta,
+  onGuardado,
+  llamar,
+}: {
+  planta: PlantaDetalle;
+  onGuardado: () => void;
+  llamar: (url: string, opts?: RequestInit) => Promise<Response | null>;
+}) {
   const [nombre, setNombre] = useState(planta.nombre);
   const [especie, setEspecie] = useState(planta.especie ?? "");
   const [riego, setRiego] = useState(String(planta.reglaRiegoDias ?? ""));
   const [poda, setPoda] = useState(String(planta.reglaPodaDias ?? ""));
   const [fert, setFert] = useState(String(planta.reglaFertilizacionDias ?? ""));
   const [guardando, setGuardando] = useState(false);
+  const [errorLocal, setErrorLocal] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setGuardando(true);
-    await fetch(`/api/plantas/${planta.id}`, {
+    setErrorLocal(false);
+    const res = await llamar(`/api/plantas/${planta.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -522,7 +534,8 @@ function EditarPlantaForm({ planta, onGuardado }: { planta: PlantaDetalle; onGua
       }),
     });
     setGuardando(false);
-    onGuardado();
+    if (res) onGuardado();
+    else setErrorLocal(true);
   }
 
   const campo = "w-full rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm";
@@ -530,8 +543,14 @@ function EditarPlantaForm({ planta, onGuardado }: { planta: PlantaDetalle; onGua
   return (
     <form onSubmit={onSubmit} className="mt-1 flex flex-col gap-3 rounded-md border border-border p-3">
       <div className="grid grid-cols-2 gap-2">
-        <input className={campo} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" />
-        <input className={campo} value={especie} onChange={(e) => setEspecie(e.target.value)} placeholder="Especie" />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted">Nombre</label>
+          <input className={campo} value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-muted">Especie</label>
+          <input className={campo} value={especie} onChange={(e) => setEspecie(e.target.value)} />
+        </div>
       </div>
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-1">
@@ -550,6 +569,7 @@ function EditarPlantaForm({ planta, onGuardado }: { planta: PlantaDetalle; onGua
       <p className="text-xs text-muted">
         La IA lo sugiere automáticamente según la especie al analizar una foto; ajústalo aquí solo si no coincide con lo que tu planta necesita.
       </p>
+      {errorLocal && <p className="text-sm font-medium text-rojo">No se guardaron los cambios. Intenta de nuevo.</p>}
       <Button type="submit" disabled={guardando} className="self-start">{guardando ? "Guardando…" : "Guardar cambios"}</Button>
     </form>
   );
