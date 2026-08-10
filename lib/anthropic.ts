@@ -112,3 +112,49 @@ export async function analizarFoto(imagenBase64: string, mediaType: string, espe
     return await intentarAnalisis(imagenBase64, mediaType, especieActual);
   }
 }
+
+export interface SugerenciaCuidado {
+  riegoSugeridoDias: number | null;
+  podaSugeridaDias: number | null;
+  fertilizacionSugeridaDias: number | null;
+}
+
+async function intentarSugerenciaCuidado(especie: string): Promise<SugerenciaCuidado> {
+  const mensaje = await anthropic.messages.create({
+    model: "claude-sonnet-4-5",
+    max_tokens: 200,
+    messages: [
+      {
+        role: "user",
+        content: `Eres un asesor experto en botánica. Para la especie "${especie}", en condiciones típicas de interior/exterior en casa, sugiere cada cuántos días conviene regarla, podarla/revisarla y fertilizarla.
+
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto antes o después:
+{
+  "riego_sugerido_dias": number o null,
+  "poda_sugerida_dias": number o null (null si esta especie no suele necesitar poda regular),
+  "fertilizacion_sugerida_dias": number o null (null si no aplica)
+}`,
+      },
+    ],
+  });
+
+  const bloqueTexto = mensaje.content.find((b) => b.type === "text");
+  if (!bloqueTexto || bloqueTexto.type !== "text") throw new Error("La IA no devolvió texto");
+
+  const obj = extraerJson(bloqueTexto.text);
+  const numeroONulo = (v: unknown): number | null => (typeof v === "number" && !Number.isNaN(v) ? v : null);
+
+  return {
+    riegoSugeridoDias: numeroONulo(obj.riego_sugerido_dias),
+    podaSugeridaDias: numeroONulo(obj.poda_sugerida_dias),
+    fertilizacionSugeridaDias: numeroONulo(obj.fertilizacion_sugerida_dias),
+  };
+}
+
+export async function sugerirCuidadosPorEspecie(especie: string): Promise<SugerenciaCuidado> {
+  try {
+    return await intentarSugerenciaCuidado(especie);
+  } catch {
+    return await intentarSugerenciaCuidado(especie);
+  }
+}

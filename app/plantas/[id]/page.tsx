@@ -72,6 +72,7 @@ export default function PerfilPlanta() {
   const [mensajeAnalisis, setMensajeAnalisis] = useState<string | null>(null);
   const [editando, setEditando] = useState(false);
   const [reintentando, setReintentando] = useState<string | null>(null);
+  const [confirmandoEspecie, setConfirmandoEspecie] = useState(false);
   const [nuevoTipoBitacora, setNuevoTipoBitacora] = useState<string>("riego");
   const [accionError, setAccionError] = useState<string | null>(null);
 
@@ -184,11 +185,9 @@ export default function PerfilPlanta() {
   }
 
   async function aceptarEspecieIA() {
-    const res = await llamar(`/api/plantas/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ especie: planta!.especieSugeridaIa }),
-    });
+    setConfirmandoEspecie(true);
+    const res = await llamar(`/api/plantas/${id}/confirmar-especie`, { method: "POST" });
+    setConfirmandoEspecie(false);
     if (res) cargar();
   }
 
@@ -305,8 +304,12 @@ export default function PerfilPlanta() {
                 <span>
                   La IA identificó esto como <strong className="text-accent">{planta.especieSugeridaIa}</strong> ¿corregir?
                 </span>
-                <button onClick={aceptarEspecieIA} className="flex-none text-sm font-semibold text-accent underline underline-offset-2">
-                  Aceptar
+                <button
+                  onClick={aceptarEspecieIA}
+                  disabled={confirmandoEspecie}
+                  className="flex-none text-sm font-semibold text-accent underline underline-offset-2 disabled:opacity-50"
+                >
+                  {confirmandoEspecie ? "Actualizando…" : "Aceptar"}
                 </button>
               </div>
             )}
