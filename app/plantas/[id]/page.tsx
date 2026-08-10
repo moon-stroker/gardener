@@ -73,6 +73,7 @@ export default function PerfilPlanta() {
   const [editando, setEditando] = useState(false);
   const [reintentando, setReintentando] = useState<string | null>(null);
   const [confirmandoEspecie, setConfirmandoEspecie] = useState(false);
+  const [sugerirReanalisis, setSugerirReanalisis] = useState(false);
   const [nuevoTipoBitacora, setNuevoTipoBitacora] = useState<string>("riego");
   const [accionError, setAccionError] = useState<string | null>(null);
 
@@ -184,11 +185,30 @@ export default function PerfilPlanta() {
     if (res) cargar();
   }
 
-  async function aceptarEspecieIA() {
+  async function usarEspecieDeIA() {
     setConfirmandoEspecie(true);
     const res = await llamar(`/api/plantas/${id}/confirmar-especie`, { method: "POST" });
     setConfirmandoEspecie(false);
+    if (res) {
+      setSugerirReanalisis(planta!.fotos.length > 0);
+      cargar();
+    }
+  }
+
+  async function mantenerEspecieManual() {
+    const res = await llamar(`/api/plantas/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ especieSugeridaIa: planta!.especie }),
+    });
     if (res) cargar();
+  }
+
+  async function reanalizarUltimaFoto() {
+    const ultima = planta!.fotos[0];
+    if (!ultima) return;
+    setSugerirReanalisis(false);
+    await reintentarAnalisis(ultima);
   }
 
   async function agregarBitacora(e: React.FormEvent<HTMLFormElement>) {
@@ -300,17 +320,43 @@ export default function PerfilPlanta() {
             </div>
 
             {planta.especieSugeridaIa && planta.especieSugeridaIa !== planta.especie && (
-              <div className="flex items-center justify-between gap-3 rounded-md border border-accent/25 bg-accent-soft px-3 py-2 text-sm">
+              <div className="flex flex-col gap-2 rounded-md border border-accent/25 bg-accent-soft px-3 py-2 text-sm">
                 <span>
-                  La IA identificó esto como <strong className="text-accent">{planta.especieSugeridaIa}</strong> ¿corregir?
+                  La IA identificó esto como <strong className="text-accent">{planta.especieSugeridaIa}</strong>, distinto a lo que
+                  tienes registrado (<strong>{planta.especie ?? "sin especie"}</strong>). ¿Cuál es correcto?
                 </span>
-                <button
-                  onClick={aceptarEspecieIA}
-                  disabled={confirmandoEspecie}
-                  className="flex-none text-sm font-semibold text-accent underline underline-offset-2 disabled:opacity-50"
-                >
-                  {confirmandoEspecie ? "Actualizando…" : "Aceptar"}
-                </button>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <button
+                    onClick={usarEspecieDeIA}
+                    disabled={confirmandoEspecie}
+                    className="flex-none text-sm font-semibold text-accent underline underline-offset-2 disabled:opacity-50"
+                  >
+                    {confirmandoEspecie ? "Actualizando…" : `Usar "${planta.especieSugeridaIa}" (la IA)`}
+                  </button>
+                  <button
+                    onClick={mantenerEspecieManual}
+                    disabled={confirmandoEspecie}
+                    className="flex-none text-sm font-semibold text-muted underline underline-offset-2 disabled:opacity-50"
+                  >
+                    Mantener &quot;{planta.especie ?? "sin especie"}&quot; (la mía)
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {sugerirReanalisis && (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-accent/25 bg-accent-soft px-3 py-2 text-sm">
+                <span>Cambiaste la especie — ¿reanalizamos la última foto para que la recomendación coincida?</span>
+                <div className="flex flex-none gap-3">
+                  <button
+                    onClick={reanalizarUltimaFoto}
+                    disabled={reintentando === planta.fotos[0]?.id}
+                    className="font-semibold text-accent underline underline-offset-2 disabled:opacity-50"
+                  >
+                    {reintentando === planta.fotos[0]?.id ? "Analizando…" : "Reanalizar"}
+                  </button>
+                  <button onClick={() => setSugerirReanalisis(false)} className="font-medium text-muted">Ahora no</button>
+                </div>
               </div>
             )}
 
@@ -374,7 +420,15 @@ export default function PerfilPlanta() {
             {mensajeAnalisis && <p className="text-sm text-amarillo">{mensajeAnalisis}</p>}
 
             {editando && (
-              <EditarPlantaForm planta={planta} llamar={llamar} onGuardado={() => { setEditando(false); cargar(); }} />
+              <EditarPlantaForm
+                planta={planta}
+                llamar={llamar}
+                onGuardado={(especieCambio) => {
+                  setEditando(false);
+                  if (especieCambio && planta.fotos.length > 0) setSugerirReanalisis(true);
+                  cargar();
+                }}
+              />
             )}
           </div>
         </div>
@@ -507,7 +561,7 @@ function EditarPlantaForm({
   llamar,
 }: {
   planta: PlantaDetalle;
-  onGuardado: () => void;
+  onGuardado: (especieCambio: boolean) => void;
   llamar: (url: string, opts?: RequestInit) => Promise<Response | null>;
 }) {
   const [nombre, setNombre] = useState(planta.nombre);
@@ -534,7 +588,7 @@ function EditarPlantaForm({
       }),
     });
     setGuardando(false);
-    if (res) onGuardado();
+    if (res) onGuardado(especie.trim() !== (planta.especie ?? ""));
     else setErrorLocal(true);
   }
 

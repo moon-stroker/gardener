@@ -32,6 +32,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 const VALIDADORES: Record<string, (v: unknown) => boolean> = {
   nombre: (v) => typeof v === "string" && v.length > 0,
   especie: esStringONulo,
+  especieSugeridaIa: esStringONulo,
   fotoPortadaUrl: esStringONulo,
   reglaRiegoDias: esNumeroONulo,
   reglaPodaDias: esNumeroONulo,
