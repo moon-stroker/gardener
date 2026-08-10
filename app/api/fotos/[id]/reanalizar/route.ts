@@ -1,9 +1,9 @@
 import { db } from "@/db";
-import { fotos, plantas, recomendaciones } from "@/db/schema";
+import { fotos, plantas } from "@/db/schema";
 import { notFound } from "@/lib/api";
 import { analizarFoto } from "@/lib/anthropic";
 import { analisisDisponiblesHoy } from "@/lib/rate-limit";
-import { descartarRecomendacionesPendientes } from "@/lib/plantas";
+import { crearRecomendacionesDeAnalisis, descartarRecomendacionesPendientes } from "@/lib/plantas";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -20,7 +20,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
   const { disponible, limite } = await analisisDisponiblesHoy();
   if (!disponible) {
     return NextResponse.json({
-      recomendacion: null,
+      recomendaciones: [],
       analisis: { estado: "limite_alcanzado", mensaje: `Se alcanzó el límite diario de ${limite} análisis con IA. Intenta más tarde.` },
     });
   }
@@ -34,21 +34,8 @@ export async function POST(_request: NextRequest, { params }: Params) {
     const resultado = await analizarFoto(buffer.toString("base64"), mediaType, planta.especie);
 
     await descartarRecomendacionesPendientes(planta.id);
-
-    const [recomendacion] = await db
-      .insert(recomendaciones)
-      .values({
-        id: crypto.randomUUID(),
-        plantaId: planta.id,
-        fotoId: foto.id,
-        texto: resultado.diagnostico,
-        tipo: resultado.tipo,
-        fechaSugerida: resultado.fechaSugerida,
-        urgencia: resultado.urgencia,
-        atendida: 0,
-        creadoEn: new Date().toISOString(),
-      })
-      .returning();
+    const ahora = new Date().toISOString();
+    const recomendacionesCreadas = await crearRecomendacionesDeAnalisis(planta.id, foto.id, resultado.aspectos, ahora);
 
     const cambiosPlanta: Record<string, unknown> = {};
     if (resultado.especieIdentificada) {
@@ -68,10 +55,11 @@ export async function POST(_request: NextRequest, { params }: Params) {
       await db.update(plantas).set(cambiosPlanta).where(eq(plantas.id, planta.id));
     }
 
-    return NextResponse.json({ recomendacion, analisis: { estado: "ok" } });
+    const mensaje = recomendacionesCreadas.length === 0 ? "¡Todo en orden! La IA no encontró nada que necesite atención." : undefined;
+    return NextResponse.json({ recomendaciones: recomendacionesCreadas, analisis: { estado: "ok", mensaje } });
   } catch {
     return NextResponse.json({
-      recomendacion: null,
+      recomendaciones: [],
       analisis: { estado: "pendiente", mensaje: "El reintento también falló. Puedes intentarlo de nuevo más tarde." },
     });
   }

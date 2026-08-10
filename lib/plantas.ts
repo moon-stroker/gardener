@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { bitacora, recomendaciones } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { calcularEstado, type Estado, type EstadoDetallado } from "@/lib/semaforo";
+import type { Aspecto, AnalisisAspecto } from "@/lib/anthropic";
 
 async function ultimoRegistro(plantaId: string, tipo: string): Promise<string | null> {
   const [row] = await db
@@ -20,6 +21,32 @@ export async function descartarRecomendacionesPendientes(plantaId: string): Prom
     .update(recomendaciones)
     .set({ atendida: 1 })
     .where(and(eq(recomendaciones.plantaId, plantaId), eq(recomendaciones.atendida, 0)));
+}
+
+// Solo genera tarjeta de recomendación para los aspectos que necesitan atención
+// (urgencia distinta de verde) — un checkup "todo bien" no debe llenar la lista.
+export async function crearRecomendacionesDeAnalisis(
+  plantaId: string,
+  fotoId: string,
+  aspectos: Record<Aspecto, AnalisisAspecto>,
+  ahora: string
+) {
+  const filas = (Object.entries(aspectos) as [Aspecto, AnalisisAspecto][])
+    .filter(([, a]) => a.urgencia !== "verde")
+    .map(([tipo, a]) => ({
+      id: crypto.randomUUID(),
+      plantaId,
+      fotoId,
+      texto: a.diagnostico,
+      tipo,
+      fechaSugerida: a.fechaSugerida,
+      urgencia: a.urgencia,
+      atendida: 0,
+      creadoEn: ahora,
+    }));
+
+  if (filas.length === 0) return [];
+  return db.insert(recomendaciones).values(filas).returning();
 }
 
 export async function estadoDePlanta(planta: {

@@ -3,7 +3,7 @@ import { fotos, plantas, recomendaciones } from "@/db/schema";
 import { badRequest, notFound, serverError } from "@/lib/api";
 import { analizarFoto } from "@/lib/anthropic";
 import { analisisDisponiblesHoy } from "@/lib/rate-limit";
-import { descartarRecomendacionesPendientes } from "@/lib/plantas";
+import { crearRecomendacionesDeAnalisis, descartarRecomendacionesPendientes } from "@/lib/plantas";
 import { put } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!disponible) {
     return NextResponse.json({
       foto,
-      recomendacion: null,
+      recomendaciones: [],
       analisis: {
         estado: "limite_alcanzado",
         mensaje: `Se alcanzó el límite diario de ${limite} análisis con IA. La foto quedó guardada; el análisis se puede reintentar más tarde.`,
@@ -65,21 +65,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const resultado = await analizarFoto(buffer.toString("base64"), file.type, planta.especie);
 
     await descartarRecomendacionesPendientes(id);
-
-    const [recomendacion] = await db
-      .insert(recomendaciones)
-      .values({
-        id: crypto.randomUUID(),
-        plantaId: id,
-        fotoId: foto.id,
-        texto: resultado.diagnostico,
-        tipo: resultado.tipo,
-        fechaSugerida: resultado.fechaSugerida,
-        urgencia: resultado.urgencia,
-        atendida: 0,
-        creadoEn: ahora,
-      })
-      .returning();
+    const recomendacionesCreadas = await crearRecomendacionesDeAnalisis(id, foto.id, resultado.aspectos, ahora);
 
     const cambiosPlanta: Record<string, unknown> = {};
     if (resultado.especieIdentificada) {
@@ -100,7 +86,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       await db.update(plantas).set(cambiosPlanta).where(eq(plantas.id, id));
     }
 
-    return NextResponse.json({ foto, recomendacion, analisis: { estado: "ok" } });
+    const mensaje = recomendacionesCreadas.length === 0 ? "¡Todo en orden! La IA no encontró nada que necesite atención." : undefined;
+    return NextResponse.json({ foto, recomendaciones: recomendacionesCreadas, analisis: { estado: "ok", mensaje } });
   } catch {
     const [recomendacionPendiente] = await db
       .insert(recomendaciones)
@@ -118,7 +105,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({
       foto,
-      recomendacion: recomendacionPendiente,
+      recomendaciones: [recomendacionPendiente],
       analisis: { estado: "pendiente", mensaje: "El análisis de IA falló y quedó pendiente de reintento manual." },
     });
   }

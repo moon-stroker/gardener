@@ -59,6 +59,7 @@ const ETIQUETAS_BITACORA: Record<string, string> = {
   fertilizacion: "Fertilización",
   trasplante: "Trasplante",
   otro: "Otro",
+  general: "Cuidado general",
 };
 
 export default function PerfilPlanta() {
@@ -133,17 +134,8 @@ export default function PerfilPlanta() {
       const data = await res.json();
       if (!res.ok) throw new Error();
 
-      setPlanta((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          fotos: [data.foto, ...prev.fotos],
-          recomendaciones: data.recomendacion ? [data.recomendacion, ...prev.recomendaciones] : prev.recomendaciones,
-          especieSugeridaIa: prev.especieSugeridaIa,
-        };
-      });
-      if (data.analisis?.estado !== "ok") {
-        setMensajeAnalisis(data.analisis?.mensaje ?? null);
+      if (data.analisis?.mensaje) {
+        setMensajeAnalisis(data.analisis.mensaje);
       }
       cargar();
     } catch {
@@ -273,9 +265,7 @@ export default function PerfilPlanta() {
     const res = await llamar(`/api/fotos/${foto.id}/reanalizar`, { method: "POST" });
     if (res) {
       const data = await res.json();
-      if (data.analisis?.estado !== "ok") {
-        setMensajeAnalisis(data.analisis?.mensaje ?? "El análisis sigue sin poder completarse.");
-      }
+      setMensajeAnalisis(data.analisis?.mensaje ?? null);
       cargar();
     }
     setReintentando(null);
